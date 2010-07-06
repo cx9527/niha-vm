@@ -30,8 +30,9 @@ void mnemonicSetA(chunk_t *code, char *regA,
 		logging("[+] Realloc returned NULL for code->ptr allocation in SETA\n");
 	}
 
-	*(code->ptr) = 0xF0;
-	*(code->ptr + 1) = strtoul(regA, NULL, 0);
+	code->ptr[code->len] = 0xF0;
+	*((unsigned int *) (code->ptr + code->len + 1)) = strtoul(regA, NULL, 0);
+	code->len += 1 + sizeof(int);
 }
 
 /*
@@ -41,19 +42,21 @@ unsigned int readMnemonic(char **mnemonic,
 							char **regA, char **regB, char **regC,
 							chunk_t sourcecode, unsigned int index)
 {
-	u_char *currentPosition;
+	u_char *currentPosition, *endPosition;
 
 	currentPosition = sourcecode.ptr + index;
+	endPosition = sourcecode.ptr + sourcecode.len;
 
 	logging("[+] Read mnemonics at index %u: %s\n", index, currentPosition);
 
-	currentPosition+= safeRead(currentPosition, mnemonic);
-	currentPosition+= safeRead(currentPosition, regA);
-	currentPosition+= safeRead(currentPosition, regB);
-	currentPosition+= safeRead(currentPosition, regC);
+	currentPosition+= safeRead(currentPosition, endPosition, mnemonic);
+	currentPosition+= safeRead(currentPosition, endPosition, regA);
+	currentPosition+= safeRead(currentPosition, endPosition, regB);
+	currentPosition+= safeRead(currentPosition, endPosition, regC);
 
 	return currentPosition - sourcecode.ptr - index;
 }
+
 /*
  *	Code generation
  */
@@ -74,14 +77,18 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 	{
 		index+= readMnemonic(&mnemonic, &regA, &regB, &regC, sourceCode, index);
 
+		/* Safe ? :) */
+		if (mnemonic == NULL) break;
+
 		/* Do Stuff */
 		mnemonicFound = false;
 		
 		while ((position < MNEMONIC_SIZE) && (!mnemonicFound))
 		{
-			logging("[+] Comparing <%s:%s>\n"
+			logging("[+] Comparing <%s:%s> (index:%u)\n"
 					, mnemonic
-					, MNEMONICS[position].name);
+					, MNEMONICS[position].name
+					, index);
 
 			/* Should add maximun mnemonic length with strncmp */
 			if (!strcmp(mnemonic, MNEMONICS[position].name))
@@ -101,6 +108,16 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 		regB = NULL;
 		regC = NULL;
 	}
+
+	/* Pushing 0xFF indicating the end of bytecode */
+	if ((generatedCode->ptr =
+		realloc(generatedCode->ptr, sizeof(u_char)*(1))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in SETA\n");
+	}
+
+	generatedCode->ptr[generatedCode->len] = 0xFF;
+	generatedCode->len++;
 }
 
 /*
@@ -161,7 +178,8 @@ int main(int argc, char *argv[])
 	strncpy(strGeneratedcode, argv[1], strlen(argv[1]));
 	strncat(strGeneratedcode, ".bc\0", 3);
 
-	logging("[+] Writing to file %s\n", strGeneratedcode);
+	logging("[+] Generated code is %u byte(s) long\n", generatedCode.len);
+	logging("[+] Opening file %s\n", strGeneratedcode);
 
 	if ((fileGeneratedcode = fopen(strGeneratedcode, "wb+")) == NULL)
 	{
@@ -169,11 +187,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	logging("[+] Writing to file %s\n", strGeneratedcode);
+	fwrite(MAGIC_BYTES, 1, sizeof(MAGIC_BYTES), fileGeneratedcode);
+	fwrite(generatedCode.ptr, 1, generatedCode.len, fileGeneratedcode);
+
 	logging("[+] Freeing allocated memory\n");
+
+	/* Should make a destroyChunk() */
 	free(sourcecode);
 	free(strGeneratedcode);
+	free(generatedCode.ptr);
 	sourcecode = NULL;
 	strGeneratedcode = NULL;
+	generatedCode.ptr = NULL;
 
 	fclose(fileSourcecode);
 	fclose(fileGeneratedcode);
