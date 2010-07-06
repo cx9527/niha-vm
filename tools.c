@@ -24,20 +24,40 @@ int isValidMagic(u_char *bytecode)
 	return 1;
 }
 
-unsigned int safeRead(u_char *positionStart, char **word)
+/*
+ *	Read safely an input with realloc of memory by offset of five.
+ *	Parameters:
+ *		- (unsigned char*) 	Structure to read
+ *		- (unsigned char*)	Maximum of readable structure (end pointer)
+ *		- (char **) 		Word's pointer
+ */
+unsigned int safeRead(u_char *positionStart, u_char *positionEnd, char **word)
 {
-	unsigned int bufSize, position;
+	unsigned int bufSize, position, positionWord;
 
 	bufSize = 0;
 	position = 0;
+	positionWord = 0;
 
 	/* Remove whitespaces */
-	while ((*(positionStart++)) == ' ');
-	positionStart--;
-
-	while (((*(positionStart + position)) != ' ') &&
-		   ((*(positionStart + position)) != '\n'))
+	while (((*(positionStart + position)) == ' ') ||
+			((*(positionStart + position)) == '\n'))
 	{
+		if ((positionStart + position) >= positionEnd)
+		{
+			return position;
+		}
+		position++;
+	}
+
+	while (((*(positionStart + position + positionWord)) != ' ') &&
+		   ((*(positionStart + position + positionWord)) != '\n'))
+	{
+		if ((positionStart + position + positionWord ) >= positionEnd)
+		{
+			return position + positionWord;
+		}
+
 		if (position >= bufSize)
 		{
 			bufSize+= 5;
@@ -48,19 +68,19 @@ unsigned int safeRead(u_char *positionStart, char **word)
 		}
 
 		logging("[+] Reading character @%u %c\n"
-					, position
-					, *(positionStart + position));
-		(*word)[position] = *(positionStart + position);
-		position++;
+					, position + positionWord
+					, *(positionStart + position + positionWord));
+		(*word)[positionWord] = *(positionStart + position + positionWord);
+		positionWord++;
 	}
 
 	/* No need to realloc since position < bufSize */
 	if (*word)
 	{
-		(*word)[position] = '\0';
+		(*word)[positionWord] = '\0';
 	}
 
 	logging("[+] Successfully parsed word: %s\n", *word);
 
-	return position;
+	return position + positionWord;
 }

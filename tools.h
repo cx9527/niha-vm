@@ -29,6 +29,6 @@ typedef struct mnemonic_t
 
 void logging(char *fmt __attribute__((unused)), ...);
 int isValidMagic(u_char *bytecode);
-unsigned int safeRead(u_char *positionStart, char **word);
+unsigned int safeRead(u_char *positionStart, u_char *positionEnd, char **word);
 
 #endif
