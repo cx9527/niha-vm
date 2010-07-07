@@ -105,7 +105,7 @@ class Parser:
     def render_jmp(self, operand):
         return OPCODES["jmp"] + struct.pack("I", int(operand))
     def render_gets(self, operand):
-        return OPCODES["gets"] + struct.pack("I", int(operand))
+        return OPCODES["gets"]# + struct.pack("I", int(operand))
     def render_gett(self):
         return OPCODES["gett"]
     def render_unc(self):
@@ -158,8 +158,9 @@ if __name__ == "__main__":
         out = open("bytecode_manu", "w")
         out.write("\x21\x45\x4c\x46")
         out.write(parser.bytecode)
+        out.write("\xff")
         out.close()
-        print "wrote bytecode to bytecode_manu.s:"
+        print "wrote bytecode to bytecode_manu:"
         for c in parser.bytecode:
             sys.stdout.write("%02x " % ord(c))
         print
