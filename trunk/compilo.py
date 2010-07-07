@@ -27,7 +27,8 @@ GRAMMAR = {
             #"stra":     "^(STRA) ([a-zA-Z0-9_ ]+)$"
             "stra":     "^(STRA) ([\S ]+)$",
             "sto":      "^(STO)$",
-            "print":    "^(PRINT) ([\S ]+)"
+            "print":    "^(PRINT) ([\S ]+)",
+            "label":    "^([a-zA-Z0-9_]+):$"
           }
 
 OPCODES = {
@@ -49,7 +50,9 @@ class Instruction:
     def __init__(self):
         self.mnemonic = ""
         self.operands = []
-        self.bytes_len = 0
+    
+    def byte_len(self):
+        pass
 
 class Parser:
 
@@ -61,6 +64,7 @@ class Parser:
         self.instructions = []
         self.opcodes = {}
         self.last_str_idx = 0
+        self.pc = 0
 
     def load_code(self, code_file):
         if DEBUG:
@@ -120,6 +124,7 @@ class Parser:
     def render_gett(self):
         return OPCODES["gett"]
     def render_sto(self):
+        self.last_str_idx = self.last_str_idx+1
         return OPCODES["sto"]
     def render_unc(self):
         return OPCODES["unc"]
@@ -162,6 +167,10 @@ class Parser:
                 bc = bc + self.render_stra(i.operands[0])
             elif i.mnemonic == "print":
                 bc = bc + self.render_print(i.operands[0])
+            elif i.mnemonic == "sto":
+                bc = bc + self.render_sto()
+            elif i.mnemonic == "label":
+                pass #TODO
             else:
                 print "unknown opcode: %s" % i.mnemonic
                 return COMP_FAILED
