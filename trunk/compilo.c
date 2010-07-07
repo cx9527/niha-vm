@@ -6,9 +6,14 @@
 #include "compilo.h"
 
 const mnemonic_t MNEMONICS[] =
-{ { "SETA", &mnemonicSetA } };
-/*  { "SETB", &mnemonicSetB },
-  { "SETC", &mnemonicSetC }};*/
+{ { "SETA", &mnemonicSetA }, 
+  { "SETB", &mnemonicSetB },
+  { "SETC", &mnemonicSetC },
+  { "STRA", &mnemonicStrA },
+  { "GETS", &mnemonicGetS },
+  { "PUTT", &mnemonicPutT },
+  { "STRC", &mnemonicStrC }
+};
 /*
  *	Main usage of this compilator
  */
@@ -25,7 +30,7 @@ void mnemonicSetA(chunk_t *code, char *regA,
 								char *regC __attribute__((unused)))
 {
 	if ((code->ptr =
-		realloc(code->ptr, sizeof(u_char)*(1+sizeof(int)))) == NULL)
+		realloc(code->ptr, sizeof(u_char)*(code->len+1+sizeof(int)))) == NULL)
 	{
 		logging("[+] Realloc returned NULL for code->ptr allocation in SETA\n");
 	}
@@ -33,6 +38,136 @@ void mnemonicSetA(chunk_t *code, char *regA,
 	code->ptr[code->len] = 0xF0;
 	*((unsigned int *) (code->ptr + code->len + 1)) = strtoul(regA, NULL, 0);
 	code->len += 1 + sizeof(int);
+}
+
+/*
+ *	SETB definition
+ */
+void mnemonicSetB(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB,
+								char *regC __attribute__((unused)))
+{
+	if ((code->ptr =
+		realloc(code->ptr, sizeof(u_char)*(code->len+1+sizeof(int)))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in SETB\n");
+	}
+
+	code->ptr[code->len] = 0xF1;
+	*((unsigned int *) (code->ptr + code->len + 1)) = strtoul(regB, NULL, 0);
+	code->len += 1 + sizeof(int);
+}
+
+/*
+ *	SETC definition
+ */
+void mnemonicSetC(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB __attribute__((unused)),
+								char *regC)
+{
+	if ((code->ptr =
+		realloc(code->ptr, sizeof(u_char)*(code->len+1+sizeof(int)))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in SETC\n");
+	}
+
+	code->ptr[code->len] = 0xF2;
+	*((unsigned int *) (code->ptr + code->len + 1)) = strtoul(regC, NULL, 0);
+	code->len += 1 + sizeof(int);
+}
+
+/*
+ * STRA for String Allocation with buffer pushed in bytecode
+ */
+void mnemonicStrA(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB __attribute__((unused)),
+								char *regC __attribute__((unused)))
+{
+	if ((code->ptr =
+			realloc(code->ptr,
+			   	sizeof(u_char)*(code->len+1+sizeof(int)+strlen(regA)))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in STRA\n");
+	}
+
+	code->ptr[code->len] = 0xE0;
+	*((unsigned int *) (code->ptr + code->len + 1)) = strlen(regA);
+	memcpy(code->ptr + code->len + 1 + sizeof(int), regA, strlen(regA));
+	code->len += 1 + sizeof(int) + strlen(regA);
+}
+
+/*
+ * GETS to get reference of string number
+ */
+void mnemonicGetS(chunk_t *code, char *regA, 
+								char *regB __attribute__((unused)),
+								char *regC __attribute__((unused)))
+{
+	if ((code->ptr =
+			realloc(code->ptr,
+			   	sizeof(u_char)*(code->len+1))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in GETS\n");
+	}
+
+	mnemonicSetA(code, regA, regB, regC);
+	code->ptr[code->len] = 0xE1;
+	code->len += 1;
+}
+
+
+/*
+ * PUTT print current context
+ */
+void mnemonicPutT(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB __attribute__((unused)),
+								char *regC __attribute__((unused)))
+{
+	if ((code->ptr =
+			realloc(code->ptr,
+			   	sizeof(u_char)*(code->len+1))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in PUTT\n");
+	}
+
+	code->ptr[code->len] = 0xF6;
+	code->len += 1;
+}
+
+/*
+ * STRC Allocating a yencoded string
+ */
+void mnemonicStrC(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB __attribute__((unused)),
+								char *regC __attribute__((unused)))
+{
+	u_char i;
+
+	for (i = 0; i < strlen(regA); i++)
+	{
+		*(regA + i) -= 42;
+	}
+
+	mnemonicStrA(code, regA, regB, regC);
+}
+
+
+/*
+ * PUTT print current context
+ */
+void mnemonicPutT(chunk_t *code, char *regA __attribute__((unused)), 
+								char *regB __attribute__((unused)),
+								char *regC __attribute__((unused)))
+{
+	if ((code->ptr =
+			realloc(code->ptr,
+			   	sizeof(u_char)*(code->len+1))) == NULL)
+	{
+		logging("[+] Realloc returned NULL for code->ptr allocation in PUTT\n");
+	}
+
+	code->ptr[code->len] = 0xE2;
+	code->len += 1;
 }
 
 /*
@@ -67,7 +202,6 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 	bool mnemonicFound;
 
 	index = 0;
-	position = 0;
 	mnemonic = NULL;
 	regA = NULL;
 	regB = NULL;
@@ -82,6 +216,7 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 
 		/* Do Stuff */
 		mnemonicFound = false;
+		position = 0;
 		
 		while ((position < MNEMONIC_SIZE) && (!mnemonicFound))
 		{
@@ -96,6 +231,8 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 				MNEMONICS[position].function(generatedCode, regA, regB, regC);
 				mnemonicFound = true;
 			}
+
+			position++;
 		}
 
 		/* Free allocated memory */
@@ -110,8 +247,10 @@ void generateSourcecode(chunk_t sourceCode, chunk_t *generatedCode)
 	}
 
 	/* Pushing 0xFF indicating the end of bytecode */
+	logging("[+] Pushing 0xFF\n");
 	if ((generatedCode->ptr =
-		realloc(generatedCode->ptr, sizeof(u_char)*(1))) == NULL)
+		realloc(generatedCode->ptr, 
+				sizeof(u_char)*(generatedCode->len+1))) == NULL)
 	{
 		logging("[+] Realloc returned NULL for code->ptr allocation in SETA\n");
 	}
