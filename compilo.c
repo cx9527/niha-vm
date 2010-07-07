@@ -154,7 +154,7 @@ void mnemonicStrC(chunk_t *code, char *regA __attribute__((unused)),
 
 /*
  * PUTT print current context
- */
+ 
 void mnemonicPutT(chunk_t *code, char *regA __attribute__((unused)), 
 								char *regB __attribute__((unused)),
 								char *regC __attribute__((unused)))
@@ -168,7 +168,7 @@ void mnemonicPutT(chunk_t *code, char *regA __attribute__((unused)),
 
 	code->ptr[code->len] = 0xE2;
 	code->len += 1;
-}
+}*/
 
 /*
  *	Mnemonic parsing
