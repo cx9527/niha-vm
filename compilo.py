@@ -47,7 +47,7 @@ class Parser:
         if DEBUG:
             print "initializing parser"
         self.code = []
-        self.bytecode = []
+        self.bytecode = ""
         self.instructions = []
         self.opcodes = {}
 
@@ -68,11 +68,13 @@ class Parser:
             print "parsing code"
         for instr in self.code:
             curr_instr = Instruction()
+            instr_is_valid = False
             if DEBUG:
                 print "current instruction: %s" % instr.rstrip("\n")
             for mne in GRAMMAR:
                 instr_match = re.match(GRAMMAR[mne],instr)
                 if instr_match:
+                    instr_is_valid = True
                     if DEBUG:
                         print "found match: %s is of type %s" % (instr.rstrip("\n"), mne)
                     curr_instr.mnemonic = mne
@@ -81,10 +83,16 @@ class Parser:
                             print "found an operand: %s" % instr_match.group(2)
                         curr_instr.operands.append(instr_match.group(2))
                     self.instructions.append(curr_instr)
+                    break
+            if not instr_is_valid:
+                print "invalid instruction %s" % instr.rstrip("\n")
+                return COMP_FAILED
+
         if DEBUG:
             print "parsing results"
             for i in self.instructions:
                 print "\tmnemonic: %s\t operand(s): %s" % (i.mnemonic, i.operands)
+        return COMP_SUCCESS
 
     def render_seta(self, operand):
         return OPCODES["seta"] + struct.pack("I", int(operand))
@@ -106,7 +114,7 @@ class Parser:
         return OPCODES["putt"]
     def render_stra(self,operand):
         print "string: %s" %operand
-        return OPCODES["stra"] + struct.pack("I", len(operand)) + operand + "\0"
+        return OPCODES["stra"] + struct.pack("I", len(operand+1)) + operand + "\0"
 
     def render_bytecode(self):
         if len(self.opcodes) == 0:
@@ -138,7 +146,8 @@ class Parser:
                 print "unknown opcode: %s" % i.mnemonic
                 return COMP_FAILED
 
-        return bc
+        self.bytecode = bc
+        return COMP_SUCCESS
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
@@ -146,11 +155,11 @@ if __name__ == "__main__":
         parser.opcodes = OPCODES
         parser.load_code(sys.argv[1])
         parser.parse_code()
-        bc = parser.render_bytecode()
+        parser.render_bytecode()
         out = open("bytecode_manu", "w")
         out.write("\x21\x45\x4c\x46")
-        out.write(bc)
+        out.write(parser.bytecode)
         out.close()
-        for c in bc:
+        for c in parser.bytecode:
             sys.stdout.write("%02x " % ord(c))
         print
