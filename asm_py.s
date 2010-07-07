@@ -4,6 +4,8 @@ GETS
 PUTT
 SETA 10
 GETT
-SETB 10
+STO
+PRINT you just entered:
+SETA 1
+GETS
 PUTT
-PRINT example finished (easier print method)
