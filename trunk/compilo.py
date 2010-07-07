@@ -105,7 +105,7 @@ class Parser:
     def render_jmp(self, operand):
         return OPCODES["jmp"] + struct.pack("I", int(operand))
     def render_gets(self, operand):
-        return OPCODES["gets"]# + struct.pack("I", int(operand))
+        return OPCODES["gets"]
     def render_gett(self):
         return OPCODES["gett"]
     def render_unc(self):
