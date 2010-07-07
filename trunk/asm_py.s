@@ -6,3 +6,4 @@ SETA 10
 GETT
 SETB 10
 PUTT
+PRINT example finished (easier print method)
