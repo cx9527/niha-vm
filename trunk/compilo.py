@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+compiler for niha-vm virtual machine
+
+s1gma
+"""
+
 import re
 import sys
 import struct
@@ -15,10 +21,13 @@ GRAMMAR = {
             "cmp":      "^(CMP)$",
             "jmp":      "^(JMP) ([0-9])+$",
             "gett":     "^(GETT)$",
-            "gets":     "^(GETS) ([0-9]+)$",
+            "gets":     "^(GETS)$",
             "putt":     "^(PUTT)$",
             "unc":      "^(UNC)$",
-            "stra":     "^(STRA) ([a-zA-Z0-9 ]+)$"
+            #"stra":     "^(STRA) ([a-zA-Z0-9_ ]+)$"
+            "stra":     "^(STRA) ([\S ]+)$",
+            "sto":      "^(STO)$",
+            "print":    "^(PRINT) ([\S ]+)"
           }
 
 OPCODES = {
@@ -31,7 +40,8 @@ OPCODES = {
             "putt":     "\xf6",
             "stra":     "\xe0",
             "gets":     "\xe1",
-            "unc":      "\xe2"
+            "unc":      "\xe2",
+            "sto":      "\xe3"
           }
 
 class Instruction:
@@ -50,6 +60,7 @@ class Parser:
         self.bytecode = ""
         self.instructions = []
         self.opcodes = {}
+        self.last_str_idx = 0
 
     def load_code(self, code_file):
         if DEBUG:
@@ -59,9 +70,9 @@ class Parser:
             self.code = f.readlines()
             f.close()
         except:
-            return COMP_SUCCESS
+            return COMP_FAILED
 
-        return COMP_FAILED
+        return COMP_SUCCESS
 
     def parse_code(self):
         if DEBUG:
@@ -70,13 +81,13 @@ class Parser:
             curr_instr = Instruction()
             instr_is_valid = False
             if DEBUG:
-                print "current instruction: %s" % instr.rstrip("\n")
+                print "current instruction: '%s'" % instr.rstrip("\n")
             for mne in GRAMMAR:
                 instr_match = re.match(GRAMMAR[mne],instr)
                 if instr_match:
                     instr_is_valid = True
                     if DEBUG:
-                        print "found match: %s is of type %s" % (instr.rstrip("\n"), mne)
+                        print "found match: '%s' is of type %s" % (instr.rstrip("\n"), mne)
                     curr_instr.mnemonic = mne
                     if len(instr_match.groups()) == 2:
                         if DEBUG:
@@ -104,16 +115,24 @@ class Parser:
         return OPCODES["cmp"]
     def render_jmp(self, operand):
         return OPCODES["jmp"] + struct.pack("I", int(operand))
-    def render_gets(self, operand):
+    def render_gets(self):
         return OPCODES["gets"]
     def render_gett(self):
         return OPCODES["gett"]
+    def render_sto(self):
+        return OPCODES["sto"]
     def render_unc(self):
         return OPCODES["unc"]
     def render_putt(self):
         return OPCODES["putt"]
     def render_stra(self,operand):
+        self.last_str_idx = self.last_str_idx+1
         return OPCODES["stra"] + struct.pack("I", len(operand)+1) + operand + "\0"
+    def render_print(self,operand):
+        return self.render_stra(operand) + \
+               self.render_seta(self.last_str_idx-1) + \
+               self.render_gets() + \
+               self.render_putt()
 
     def render_bytecode(self):
         if len(self.opcodes) == 0:
@@ -134,13 +153,15 @@ class Parser:
             elif i.mnemonic == "gett":
                 bc = bc + self.render_gett()
             elif i.mnemonic == "gets":
-                bc = bc + self.render_gets(i.operands[0])
+                bc = bc + self.render_gets()
             elif i.mnemonic == "putt":
                 bc = bc + self.render_putt()
             elif i.mnemonic == "unc":
                 bc = bc + self.render_unc()
             elif i.mnemonic == "stra":
                 bc = bc + self.render_stra(i.operands[0])
+            elif i.mnemonic == "print":
+                bc = bc + self.render_print(i.operands[0])
             else:
                 print "unknown opcode: %s" % i.mnemonic
                 return COMP_FAILED
@@ -152,15 +173,18 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         parser = Parser()
         parser.opcodes = OPCODES
-        parser.load_code(sys.argv[1])
-        parser.parse_code()
-        parser.render_bytecode()
-        out = open("bytecode_manu", "w")
-        out.write("\x21\x45\x4c\x46")
-        out.write(parser.bytecode)
-        out.write("\xff")
-        out.close()
-        print "wrote bytecode to bytecode_manu:"
-        for c in parser.bytecode:
-            sys.stdout.write("%02x " % ord(c))
-        print
+        if parser.load_code(sys.argv[1]) == COMP_SUCCESS and \
+           parser.parse_code() == COMP_SUCCESS and \
+           parser.render_bytecode() == COMP_SUCCESS:
+
+            out = open("%s.bc" % sys.argv[1], "w")
+            out.write("\x21\x45\x4c\x46")
+            out.write(parser.bytecode)
+            out.write("\xff")
+            out.close()
+            print "wrote bytecode to %s.bc:" % sys.argv[1]
+            for c in parser.bytecode:
+                sys.stdout.write("%02x " % ord(c))
+            print
+        else:
+            print "error"
