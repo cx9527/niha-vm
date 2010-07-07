@@ -113,8 +113,7 @@ class Parser:
     def render_putt(self):
         return OPCODES["putt"]
     def render_stra(self,operand):
-        print "string: %s" %operand
-        return OPCODES["stra"] + struct.pack("I", len(operand+1)) + operand + "\0"
+        return OPCODES["stra"] + struct.pack("I", len(operand)+1) + operand + "\0"
 
     def render_bytecode(self):
         if len(self.opcodes) == 0:
