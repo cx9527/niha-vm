@@ -85,15 +85,16 @@ void mnemonicStrA(chunk_t *code, char *regA __attribute__((unused)),
 {
 	if ((code->ptr =
 			realloc(code->ptr,
-			   	sizeof(u_char)*(code->len+1+sizeof(int)+strlen(regA)))) == NULL)
+			   	sizeof(u_char)*(code->len+1+sizeof(int)+strlen(regA)+1)))
+					== NULL)
 	{
 		logging("[+] Realloc returned NULL for code->ptr allocation in STRA\n");
 	}
 
 	code->ptr[code->len] = 0xE0;
-	*((unsigned int *) (code->ptr + code->len + 1)) = strlen(regA);
-	memcpy(code->ptr + code->len + 1 + sizeof(int), regA, strlen(regA));
-	code->len += 1 + sizeof(int) + strlen(regA);
+	*((unsigned int *) (code->ptr + code->len + 1)) = strlen(regA) + 1;
+	memcpy(code->ptr + code->len + 1 + sizeof(int), regA, strlen(regA) + 1);
+	code->len += 1 + sizeof(int) + strlen(regA) + 1;
 }
 
 /*

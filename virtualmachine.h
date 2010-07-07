@@ -16,7 +16,7 @@
 
 #include "tools.h"
 
-#define OPCODES_SIZE 10
+#define OPCODES_SIZE 11
 #define MAX_STRINGS 10
 
 extern u_char MAGIC_BYTES[4];

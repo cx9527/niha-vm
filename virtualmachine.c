@@ -128,6 +128,18 @@ void getstr(void *procVoid)
 	proc->regA = (int) proc->strings[proc->regA].ptr;
 }
 
+/*
+ * In: A->addressofstring
+ * In: B->sizeofstring
+ */
+void strstore(void *procVoid)
+{
+	processor_t *proc = (processor_t*) procVoid;
+	proc->strings[proc->stringslen].len = proc->regB;
+	proc->strings[proc->stringslen].ptr = (u_char*) proc->regA;
+	proc->stringslen++;
+}
+
 void initializeProc(processor_t *proc, u_char *start)
 {
 	proc->current = start;
@@ -157,6 +169,8 @@ void initializeProc(processor_t *proc, u_char *start)
 	proc->opcodes[8].func = &getstr;
 	proc->opcodes[9].opcode = 0xE2;
 	proc->opcodes[9].func = &uncipher;
+	proc->opcodes[10].opcode = 0xE3;
+	proc->opcodes[10].func = &strstore;
 }
 
 void destroyProc(processor_t *proc __attribute__((unused)))
