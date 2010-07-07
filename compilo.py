@@ -14,6 +14,10 @@ COMP_SUCCESS    = 0x0
 COMP_FAILED     = 0x1
 DEBUG           = True
 
+
+# TODO
+# add grammar : CIPH, and test with UNC
+
 GRAMMAR = {
             "seta":     "^(SETA) ([0-9]+)$",
             "setb":     "^(SETB) ([0-9]+)$",
@@ -24,7 +28,6 @@ GRAMMAR = {
             "gets":     "^(GETS)$",
             "putt":     "^(PUTT)$",
             "unc":      "^(UNC)$",
-            #"stra":     "^(STRA) ([a-zA-Z0-9_ ]+)$"
             "stra":     "^(STRA) ([\S ]+)$",
             "sto":      "^(STO)$",
             "print":    "^(PRINT) ([\S ]+)",
@@ -52,7 +55,7 @@ class Instruction:
         self.operands = []
     
     def byte_len(self):
-        pass
+        pass # TODO
 
 class Parser:
 
@@ -67,6 +70,10 @@ class Parser:
         self.pc = 0
 
     def load_code(self, code_file):
+        """
+        load source file in the parser
+        """
+
         if DEBUG:
             print "loading code from file %s" % code_file
         try:
@@ -79,6 +86,10 @@ class Parser:
         return COMP_SUCCESS
 
     def parse_code(self):
+        """
+        parse source code, and fills the instructions of the parser
+        """
+
         if DEBUG:
             print "parsing code"
         for instr in self.code:
@@ -132,7 +143,7 @@ class Parser:
         return OPCODES["putt"]
     def render_stra(self,operand):
         self.last_str_idx = self.last_str_idx+1
-        return OPCODES["stra"] + struct.pack("I", len(operand)+1) + operand + "\0"
+        return OPCODES["stra"] + struct.pack("I", len(operand)+1) + operand + "\x00"
     def render_print(self,operand):
         return self.render_stra(operand) + \
                self.render_seta(self.last_str_idx-1) + \
@@ -140,6 +151,10 @@ class Parser:
                self.render_putt()
 
     def render_bytecode(self):
+        """
+        translate the parser instructions into bytecode
+        """
+
         if len(self.opcodes) == 0:
             print "opcodes not initialized"
             return COMP_FAILED
@@ -185,7 +200,6 @@ if __name__ == "__main__":
         if parser.load_code(sys.argv[1]) == COMP_SUCCESS and \
            parser.parse_code() == COMP_SUCCESS and \
            parser.render_bytecode() == COMP_SUCCESS:
-
             out = open("%s.bc" % sys.argv[1], "w")
             out.write("\x21\x45\x4c\x46")
             out.write(parser.bytecode)
@@ -196,4 +210,4 @@ if __name__ == "__main__":
                 sys.stdout.write("%02x " % ord(c))
             print
         else:
-            print "error"
+            print "compilation failed"
