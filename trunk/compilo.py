@@ -160,6 +160,7 @@ if __name__ == "__main__":
         out.write("\x21\x45\x4c\x46")
         out.write(parser.bytecode)
         out.close()
+        print "wrote bytecode to bytecode_manu.s:"
         for c in parser.bytecode:
             sys.stdout.write("%02x " % ord(c))
         print
