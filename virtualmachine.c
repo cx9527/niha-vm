@@ -140,6 +140,19 @@ void strstore(void *procVoid)
 	proc->stringslen++;
 }
 
+/*
+ *	Jump if compare flag isn't set
+ */
+void funcjne(void *procVoid)
+{
+	processor_t *proc = (processor_t*) procVoid;
+
+	if (proc->flags & (1 << 7))
+		proc->current += *(int*) (proc->current + 1);
+	else
+		proc->current += 1 + sizeof(int*);
+}
+
 void initializeProc(processor_t *proc, u_char *start)
 {
 	proc->current = start;
@@ -171,6 +184,8 @@ void initializeProc(processor_t *proc, u_char *start)
 	proc->opcodes[9].func = &uncipher;
 	proc->opcodes[10].opcode = 0xE3;
 	proc->opcodes[10].func = &strstore;
+	proc->opcodes[11].opcode = 0xF7;
+	proc->opcodes[11].func = &funcjne;
 }
 
 void destroyProc(processor_t *proc __attribute__((unused)))
