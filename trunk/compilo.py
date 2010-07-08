@@ -16,7 +16,6 @@ DEBUG           = True
 
 
 # TODO
-# add grammar : CIPH, and test with UNC
 # JUMP
 
 GRAMMAR = {
@@ -55,9 +54,7 @@ class Instruction:
     def __init__(self):
         self.mnemonic = ""
         self.operands = []
-    
-    def byte_len(self):
-        pass # TODO
+        self.byte_len = 0
 
 class Parser:
 
@@ -91,7 +88,6 @@ class Parser:
         """
         parse source code, and fills the instructions of the parser
         """
-
         if DEBUG:
             print "parsing code"
         for instr in self.code:
@@ -161,19 +157,8 @@ class Parser:
                self.render_putt()
     def render_ciph(self,operand):
         ciphered_operand = ""
-        if DEBUG:
-            print "ciphering string: %s" % operand
         for c in operand:
-            #ciph_char = struct.pack("B", ord(c) - 42)
-            #ciphered_operand = ciphered_operand + ciph_char
             ciphered_operand = ciphered_operand + chr((ord(c) - 42) % 255)
-        if DEBUG:
-            for c in operand:
-                sys.stdout.write(hex(ord(c)) +  " ")
-            print
-            for c in ciphered_operand:
-                sys.stdout.write(hex(ord(c)) +  " ")
-            print
         return self.render_stra(ciphered_operand)
 
     def render_bytecode(self):
@@ -185,6 +170,7 @@ class Parser:
             print "opcodes not initialized"
             return COMP_FAILED
         bc = ""
+        prev_bc_len = 0
         for i in self.instructions:
             if i.mnemonic == "seta":
                 bc = bc + self.render_seta(i.operands[0])
@@ -218,7 +204,12 @@ class Parser:
                 print "unknown opcode: %s" % i.mnemonic
                 return COMP_FAILED
 
-        self.bytecode = bc
+            i.byte_len = len(bc) - prev_bc_len
+            prev_bc_len = len(bc)
+            if DEBUG:
+                print "(size:%d):\t%s %s" % (i.byte_len, i.mnemonic, i.operands)
+
+        self.bytecode = bc + "\xff"
         return COMP_SUCCESS
 
 if __name__ == "__main__":
@@ -231,7 +222,6 @@ if __name__ == "__main__":
             out = open("%s.bc" % sys.argv[1], "w")
             out.write("\x21\x45\x4c\x46")
             out.write(parser.bytecode)
-            out.write("\xff")
             out.close()
             print "wrote bytecode to %s.bc:" % sys.argv[1]
             for c in parser.bytecode:
