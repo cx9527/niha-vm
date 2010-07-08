@@ -32,7 +32,8 @@ GRAMMAR = {
             "stra":     "^(STRA) ([\S ]+)$",
             "sto":      "^(STO)$",
             "print":    "^(PRINT) ([\S ]+)",
-            "label":    "^(LABEL) ([a-zA-Z0-9_]+)$"
+            "label":    "^(LABEL) ([a-zA-Z0-9_]+)$",
+            "exit":     "^(EXIT)$"
           }
 
 OPCODES = {
@@ -46,7 +47,8 @@ OPCODES = {
             "stra":     "\xe0",
             "gets":     "\xe1",
             "unc":      "\xe2",
-            "sto":      "\xe3"
+            "sto":      "\xe3",
+            "exit":     "\xff"
           }
 
 class Instruction:
@@ -127,12 +129,19 @@ class Parser:
             print "labels found: %s" % self.labels
         for jmp in self.jmps:
             if jmp in self.labels:
+                addr    = self.jmps[jmp]
+                offset  = int(self.labels[jmp]) - int(self.jmps[jmp])
                 if DEBUG:
-                    print "resolved one jump (relative offset: %d)" % (int(self.labels[jmp]) - int(self.jmps[jmp]))
-                addr = self.jmps[jmp]
-                buff[0:addr+1] = self.bytecode[0:addr+1]
-                buff[addr+2:addr+5] = struct.pack("I", self.labels[jmp]-self.jmps[jmp]-1) # TODO: wtf ? + backward jumps
-                buff[addr+5:] = self.bytecode[addr+5:]
+                    print "resolved one jump (relative offset: %d)" % (offset)
+                if offset > 0:
+                    buff[0:addr+1] = self.bytecode[0:addr+1]
+                    buff[addr+2:addr+5] = struct.pack("i", offset-1)
+                    buff[addr+5:] = self.bytecode[addr+5:]
+                else:
+                    buff[0:addr] = self.bytecode[0:addr]
+                    buff[addr+1:addr+5] = struct.pack("i", offset-1)
+                    buff[addr+5:] = self.bytecode[addr+5:]
+                    pass
                 self.bytecode = "".join(buff)
             else:
                 return COMP_FAILED
@@ -163,6 +172,8 @@ class Parser:
         return OPCODES["sto"]
     def render_unc(self):
         return OPCODES["unc"]
+    def render_exit(self):
+        return OPCODES["exit"]
     def render_putt(self):
         return OPCODES["putt"]
     def render_stra(self,operand):
@@ -212,6 +223,8 @@ class Parser:
                 bc = bc + self.render_putt()
             elif i.mnemonic == "unc":
                 bc = bc + self.render_unc()
+            elif i.mnemonic == "exit":
+                bc = bc + self.render_exit()
             elif i.mnemonic == "stra":
                 bc = bc + self.render_stra(i.operands[0])
             elif i.mnemonic == "ciph":
