@@ -23,7 +23,7 @@ GRAMMAR = {
             "setb":     "^(SETB) ([0-9]+)$",
             "setc":     "^(SETC) ([0-9]+)$",
             "cmp":      "^(CMP)$",
-            "jmp":      "^(JMP) ([0-9])+$",
+            "jmp":      "^(JMP) ([a-zA-Z0-9_]+)+$",
             "gett":     "^(GETT)$",
             "gets":     "^(GETS)$",
             "putt":     "^(PUTT)$",
@@ -32,7 +32,7 @@ GRAMMAR = {
             "stra":     "^(STRA) ([\S ]+)$",
             "sto":      "^(STO)$",
             "print":    "^(PRINT) ([\S ]+)",
-            "label":    "^([a-zA-Z0-9_]+):$"
+            "label":    "^(LABEL) ([a-zA-Z0-9_]+)$"
           }
 
 OPCODES = {
@@ -40,7 +40,7 @@ OPCODES = {
             "setb":     "\xf1",
             "setc":     "\xf2",
             "cmp":      "\xf3",
-            "jmp":     "\xf4",
+            "jmp":      "\xf4",
             "gett":     "\xf5",
             "putt":     "\xf6",
             "stra":     "\xe0",
@@ -67,6 +67,8 @@ class Parser:
         self.opcodes = {}
         self.last_str_idx = 0
         self.pc = 0
+        self.labels = {}
+        self.jmps = {}
 
     def load_code(self, code_file):
         """
@@ -118,6 +120,24 @@ class Parser:
                 print "\tmnemonic: %s\t operand(s): %s" % (i.mnemonic, i.operands)
         return COMP_SUCCESS
 
+    def resolve_jmps(self):
+        buff = []
+        if DEBUG:
+            print "jumps to resolve: %s" % self.jmps
+            print "labels found: %s" % self.labels
+        for jmp in self.jmps:
+            if jmp in self.labels:
+                if DEBUG:
+                    print "resolved one jump (relative offset: %d)" % (int(self.labels[jmp]) - int(self.jmps[jmp]))
+                addr = self.jmps[jmp]
+                buff[0:addr+1] = self.bytecode[0:addr+1]
+                buff[addr+2:addr+5] = struct.pack("I", self.labels[jmp]-self.jmps[jmp]-1) # TODO: wtf ? + backward jumps
+                buff[addr+5:] = self.bytecode[addr+5:]
+                self.bytecode = "".join(buff)
+            else:
+                return COMP_FAILED
+        return COMP_SUCCESS
+
 #################################
 #
 # RENDERING FUNCTIONS
@@ -132,7 +152,8 @@ class Parser:
     def render_cmp(self):
         return OPCODES["cmp"]
     def render_jmp(self, operand):
-        return OPCODES["jmp"] + struct.pack("I", int(operand))
+        # we will resolve jmp adresse later
+        return OPCODES["jmp"] + struct.pack("I", 0)
     def render_gets(self):
         return OPCODES["gets"]
     def render_gett(self):
@@ -179,6 +200,7 @@ class Parser:
             elif i.mnemonic == "setc":
                 bc = bc + self.render_setc(i.operands[0])
             elif i.mnemonic == "jmp":
+                self.jmps[i.operands[0]] = len(bc)
                 bc = bc + self.render_jmp(i.operands[0])
             elif i.mnemonic == "cmp":
                 bc = bc + self.render_cmp()
@@ -199,7 +221,7 @@ class Parser:
             elif i.mnemonic == "sto":
                 bc = bc + self.render_sto()
             elif i.mnemonic == "label":
-                pass #TODO
+                self.labels[i.operands[0]] = len(bc)
             else:
                 print "unknown opcode: %s" % i.mnemonic
                 return COMP_FAILED
@@ -210,6 +232,7 @@ class Parser:
                 print "(size:%d):\t%s %s" % (i.byte_len, i.mnemonic, i.operands)
 
         self.bytecode = bc + "\xff"
+        self.resolve_jmps()
         return COMP_SUCCESS
 
 if __name__ == "__main__":
