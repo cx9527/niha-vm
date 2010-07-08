@@ -1,0 +1,17 @@
+STRA hello!
+SETA 0
+GETS
+PUTT
+JMP foo
+LABEL bar
+STRA win !!
+SETA 2
+GETS
+PUTT
+EXIT
+LABEL foo
+STRA so....
+SETA 1
+GETS
+PUTT
+JMP bar
