@@ -13,7 +13,7 @@ import struct
 COMP_SUCCESS    = 0x0
 COMP_FAILED     = 0x1
 DEBUG           = True
-
+MAGIC           = "\x21\x45\x4c\x46"
 
 # TODO
 # JUMP
@@ -220,10 +220,10 @@ if __name__ == "__main__":
            parser.parse_code() == COMP_SUCCESS and \
            parser.render_bytecode() == COMP_SUCCESS:
             out = open("%s.bc" % sys.argv[1], "w")
-            out.write("\x21\x45\x4c\x46")
+            out.write(MAGIC)
             out.write(parser.bytecode)
             out.close()
-            print "wrote bytecode to %s.bc:" % sys.argv[1]
+            print "wrote bytecode to %s.bc (added magic prefix):" % sys.argv[1]
             for c in parser.bytecode:
                 sys.stdout.write("%02x " % ord(c))
             print
