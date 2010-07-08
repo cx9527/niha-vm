@@ -17,6 +17,7 @@ DEBUG           = True
 
 # TODO
 # add grammar : CIPH, and test with UNC
+# JUMP
 
 GRAMMAR = {
             "seta":     "^(SETA) ([0-9]+)$",
@@ -28,6 +29,7 @@ GRAMMAR = {
             "gets":     "^(GETS)$",
             "putt":     "^(PUTT)$",
             "unc":      "^(UNC)$",
+            "ciph":     "^(CIPH) ([\S ]+)$",
             "stra":     "^(STRA) ([\S ]+)$",
             "sto":      "^(STO)$",
             "print":    "^(PRINT) ([\S ]+)",
@@ -120,6 +122,11 @@ class Parser:
                 print "\tmnemonic: %s\t operand(s): %s" % (i.mnemonic, i.operands)
         return COMP_SUCCESS
 
+#################################
+#
+# RENDERING FUNCTIONS
+#
+#################################
     def render_seta(self, operand):
         return OPCODES["seta"] + struct.pack("I", int(operand))
     def render_setb(self, operand):
@@ -143,12 +150,31 @@ class Parser:
         return OPCODES["putt"]
     def render_stra(self,operand):
         self.last_str_idx = self.last_str_idx+1
-        return OPCODES["stra"] + struct.pack("I", len(operand)+1) + operand + "\x00"
+        return OPCODES["stra"] + \
+               struct.pack("I", len(operand)+1) + \
+               operand + \
+               "\x00"
     def render_print(self,operand):
         return self.render_stra(operand) + \
                self.render_seta(self.last_str_idx-1) + \
                self.render_gets() + \
                self.render_putt()
+    def render_ciph(self,operand):
+        ciphered_operand = ""
+        if DEBUG:
+            print "ciphering string: %s" % operand
+        for c in operand:
+            #ciph_char = struct.pack("B", ord(c) - 42)
+            #ciphered_operand = ciphered_operand + ciph_char
+            ciphered_operand = ciphered_operand + chr((ord(c) - 42) % 255)
+        if DEBUG:
+            for c in operand:
+                sys.stdout.write(hex(ord(c)) +  " ")
+            print
+            for c in ciphered_operand:
+                sys.stdout.write(hex(ord(c)) +  " ")
+            print
+        return self.render_stra(ciphered_operand)
 
     def render_bytecode(self):
         """
@@ -180,6 +206,8 @@ class Parser:
                 bc = bc + self.render_unc()
             elif i.mnemonic == "stra":
                 bc = bc + self.render_stra(i.operands[0])
+            elif i.mnemonic == "ciph":
+                bc = bc + self.render_ciph(i.operands[0])
             elif i.mnemonic == "print":
                 bc = bc + self.render_print(i.operands[0])
             elif i.mnemonic == "sto":
