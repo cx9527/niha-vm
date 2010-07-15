@@ -103,7 +103,7 @@ class Parser:
         f = open("opcodes.h", "w")
         for mne in MNEMONICS:
             self.opcodes[mne] = chr(random.randint(0x00, 0xff))
-            f.write("OP_%s = 0x%02x\n" % (mne,ord(self.opcodes[mne])))
+            f.write("#define OP_%s\t\t0x%02x\n" % (mne,ord(self.opcodes[mne])))
         f.close()
         if DEBUG:
             f = open("opcodes.h", "r")
