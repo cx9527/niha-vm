@@ -30,6 +30,7 @@ void printProc(processor_t proc)
 
 void setCompareFlag(processor_t *proc, int boolean)
 {
+    proc->flags = proc->flags & 0x7f;
 	proc->flags |= boolean<<7;
 }
 
@@ -150,7 +151,7 @@ void funcjne(void *procVoid)
 	if (proc->flags & (1 << 7))
 		proc->current += *(int*) (proc->current + 1);
 	else
-		proc->current += 1 + sizeof(int*);
+		proc->current += sizeof(int*);
 }
 
 void initializeProc(processor_t *proc, u_char *start)

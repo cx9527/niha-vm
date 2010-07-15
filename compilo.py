@@ -10,6 +10,7 @@ import re
 import sys
 import struct
 import os
+import random
 
 COMP_SUCCESS    = 0x0
 COMP_FAILED     = 0x1
@@ -17,7 +18,21 @@ DEBUG           = True
 MAGIC           = "\x21\x45\x4c\x46"
 OVERWRITE       = True
 
-# TODO
+MNEMONICS = (
+                "exit",
+                "seta",
+                "setb",
+                "setc",
+                "cmp",
+                "jmp",
+                "gett",
+                "putt",
+                "jne",
+                "stra",
+                "gets",
+                "unc",
+                "sto"
+            )
 
 GRAMMAR = {
             "seta":     "^(SETA) ([0-9]+)$",
@@ -64,8 +79,6 @@ class Instruction:
 class Parser:
 
     def __init__(self):
-        if DEBUG:
-            print "initializing parser"
         self.code = []
         self.bytecode = ""
         self.instructions = []
@@ -74,6 +87,30 @@ class Parser:
         self.pc = 0
         self.labels = {}
         self.jmps = {}
+
+    def gen_opcodes(self):
+        """
+        generate random opcodes
+        fills self.opcodes and writes to opcodes.h
+        """
+        dev_rand = open("/dev/urandom", "r")
+        rand_seed = dev_rand.read(42)
+        if DEBUG:
+            # pure sex !!!
+            print "random seed: %s" % (" ".join(map(str,[hex(ord(c)) for c in rand_seed])))
+        random.seed(rand_seed)
+        dev_rand.close()
+        f = open("opcodes.h", "w")
+        for mne in MNEMONICS:
+            self.opcodes[mne] = chr(random.randint(0x00, 0xff))
+            f.write("OP_%s = 0x%02x\n" % (mne,ord(self.opcodes[mne])))
+        f.close()
+        if DEBUG:
+            f = open("opcodes.h", "r")
+            print "generated opcodes"
+            for line in f:
+                sys.stdout.write("\t" + line)
+            f.close()
 
     def load_code(self, code_file):
         """
@@ -100,22 +137,22 @@ class Parser:
             curr_instr = Instruction()
             instr_is_valid = False
             if DEBUG:
-                print "current instruction: '%s'" % instr.rstrip("\n")
+                print "\tcurrent instruction: '%s'" % instr.rstrip("\n")
             for mne in GRAMMAR:
                 instr_match = re.match(GRAMMAR[mne],instr)
                 if instr_match:
                     instr_is_valid = True
                     if DEBUG:
-                        print "found match: '%s' is of type %s" % (instr.rstrip("\n"), mne)
+                        print "\tfound match: '%s' is of type %s" % (instr.rstrip("\n"), mne)
                     curr_instr.mnemonic = mne
                     if len(instr_match.groups()) == 2:
                         if DEBUG:
-                            print "found an operand: %s" % instr_match.group(2)
+                            print "\tfound an operand: %s" % instr_match.group(2)
                         curr_instr.operands.append(instr_match.group(2))
                     self.instructions.append(curr_instr)
                     break
             if not instr_is_valid:
-                print "invalid instruction %s" % instr.rstrip("\n")
+                print "\tinvalid instruction %s" % instr.rstrip("\n")
                 return COMP_FAILED
 
         if DEBUG:
@@ -128,16 +165,18 @@ class Parser:
         """
         resolve jumps (they were left blank by the render_bytecode() funtion)
         """
+        if DEBUG:
+            print "jumps resolution"
         buff = []
         if DEBUG:
-            print "jumps to resolve: %s" % self.jmps
-            print "labels found: %s" % self.labels
+            print "\tjumps to resolve: %s" % self.jmps
+            print "\tlabels found: %s" % self.labels
         for jmp in self.jmps:
             if jmp in self.labels:
                 addr    = self.jmps[jmp]
                 offset  = int(self.labels[jmp]) - int(self.jmps[jmp])
                 if DEBUG:
-                    print "resolved one jump (relative offset: %d)" % (offset)
+                    print "\tresolved one jump (relative offset: %d)" % (offset)
 
                 ################################
                 # TODO: THIS CODE GIVES CANCER #
@@ -173,35 +212,35 @@ class Parser:
 #
 #################################
     def render_seta(self, operand):
-        return OPCODES["seta"] + struct.pack("I", int(operand))
+        return self.opcodes["seta"] + struct.pack("I", int(operand))
     def render_setb(self, operand):
-        return OPCODES["setb"] + struct.pack("I", int(operand))
+        return self.opcodes["setb"] + struct.pack("I", int(operand))
     def render_setc(self, operand):
-        return OPCODES["setc"] + struct.pack("I", int(operand))
+        return self.opcodes["setc"] + struct.pack("I", int(operand))
     def render_cmp(self):
-        return OPCODES["cmp"]
+        return self.opcodes["cmp"]
     def render_jmp(self, operand):
         # we will resolve jmp adresse later, for now, offset == 0x0
-        return OPCODES["jmp"] + struct.pack("I", 0)
+        return self.opcodes["jmp"] + struct.pack("I", 0)
     def render_jne(self, operand):
         # we will resolve jne adresse later, for now, offset == 0x0
-        return OPCODES["jne"] + struct.pack("I", 0)
+        return self.opcodes["jne"] + struct.pack("I", 0)
     def render_gets(self):
-        return OPCODES["gets"]
+        return self.opcodes["gets"]
     def render_gett(self):
-        return OPCODES["gett"]
+        return self.opcodes["gett"]
     def render_sto(self):
         self.last_str_idx = self.last_str_idx+1
-        return OPCODES["sto"]
+        return self.opcodes["sto"]
     def render_unc(self):
-        return OPCODES["unc"]
+        return self.opcodes["unc"]
     def render_exit(self):
-        return OPCODES["exit"]
+        return self.opcodes["exit"]
     def render_putt(self):
-        return OPCODES["putt"]
+        return self.opcodes["putt"]
     def render_stra(self,operand):
         self.last_str_idx = self.last_str_idx+1
-        return OPCODES["stra"] + \
+        return self.opcodes["stra"] + \
                struct.pack("I", len(operand)+1) + \
                operand + \
                "\x00"
@@ -322,7 +361,8 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         parser = Parser()
         pack = Packager("%s.bc" % sys.argv[1])
-        parser.opcodes = OPCODES
+        #parser.opcodes = OPCODES
+        parser.gen_opcodes()
         if parser.load_code(sys.argv[1]) == COMP_SUCCESS and \
            parser.parse_code() == COMP_SUCCESS and \
            parser.render_bytecode() == COMP_SUCCESS and \
