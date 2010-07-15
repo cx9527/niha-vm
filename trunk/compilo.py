@@ -9,14 +9,15 @@ s1gma
 import re
 import sys
 import struct
+import os
 
 COMP_SUCCESS    = 0x0
 COMP_FAILED     = 0x1
 DEBUG           = True
 MAGIC           = "\x21\x45\x4c\x46"
+OVERWRITE       = True
 
 # TODO
-# JUMP
 
 GRAMMAR = {
             "seta":     "^(SETA) ([0-9]+)$",
@@ -24,6 +25,7 @@ GRAMMAR = {
             "setc":     "^(SETC) ([0-9]+)$",
             "cmp":      "^(CMP)$",
             "jmp":      "^(JMP) ([a-zA-Z0-9_]+)+$",
+            "jne":      "^(JNE) ([a-zA-Z0-9_]+)+$",
             "gett":     "^(GETT)$",
             "gets":     "^(GETS)$",
             "putt":     "^(PUTT)$",
@@ -44,6 +46,7 @@ OPCODES = {
             "jmp":      "\xf4",
             "gett":     "\xf5",
             "putt":     "\xf6",
+            "jne":      "\xf7",
             "stra":     "\xe0",
             "gets":     "\xe1",
             "unc":      "\xe2",
@@ -76,7 +79,6 @@ class Parser:
         """
         load source file in the parser
         """
-
         if DEBUG:
             print "loading code from file %s" % code_file
         try:
@@ -123,6 +125,9 @@ class Parser:
         return COMP_SUCCESS
 
     def resolve_jmps(self):
+        """
+        resolve jumps (they were left blank by the render_bytecode() funtion)
+        """
         buff = []
         if DEBUG:
             print "jumps to resolve: %s" % self.jmps
@@ -133,12 +138,27 @@ class Parser:
                 offset  = int(self.labels[jmp]) - int(self.jmps[jmp])
                 if DEBUG:
                     print "resolved one jump (relative offset: %d)" % (offset)
+
+                ################################
+                # TODO: THIS CODE GIVES CANCER #
+                ################################
+                #                              #
+                # ---------------------------- #
+                #       JMP OFFSET      LABEL  #
+                # ---------------------------- #
+                #           ^     ^            #
+                #           |     |            #
+                #        addr+1   |            #
+                #               addr+5         #
+                #                              #
+                ################################
+
                 if offset > 0:
                     buff[0:addr+1] = self.bytecode[0:addr+1]
-                    buff[addr+2:addr+5] = struct.pack("i", offset-1)
+                    buff[addr+1:addr+5] = struct.pack("i", offset-1)
                     buff[addr+5:] = self.bytecode[addr+5:]
                 else:
-                    buff[0:addr] = self.bytecode[0:addr]
+                    buff[0:addr+1] = self.bytecode[0:addr+1]
                     buff[addr+1:addr+5] = struct.pack("i", offset-1)
                     buff[addr+5:] = self.bytecode[addr+5:]
                     pass
@@ -161,8 +181,11 @@ class Parser:
     def render_cmp(self):
         return OPCODES["cmp"]
     def render_jmp(self, operand):
-        # we will resolve jmp adresse later
+        # we will resolve jmp adresse later, for now, offset == 0x0
         return OPCODES["jmp"] + struct.pack("I", 0)
+    def render_jne(self, operand):
+        # we will resolve jne adresse later, for now, offset == 0x0
+        return OPCODES["jne"] + struct.pack("I", 0)
     def render_gets(self):
         return OPCODES["gets"]
     def render_gett(self):
@@ -196,6 +219,7 @@ class Parser:
     def render_bytecode(self):
         """
         translate the parser instructions into bytecode
+        fills the bytecode of the parser, and resove jumps
         """
 
         if len(self.opcodes) == 0:
@@ -213,6 +237,9 @@ class Parser:
             elif i.mnemonic == "jmp":
                 self.jmps[i.operands[0]] = len(bc)
                 bc = bc + self.render_jmp(i.operands[0])
+            elif i.mnemonic == "jne":
+                self.jmps[i.operands[0]] = len(bc)
+                bc = bc + self.render_jne(i.operands[0])
             elif i.mnemonic == "cmp":
                 bc = bc + self.render_cmp()
             elif i.mnemonic == "gett":
@@ -244,24 +271,64 @@ class Parser:
             if DEBUG:
                 print "(size:%d):\t%s %s" % (i.byte_len, i.mnemonic, i.operands)
 
-        self.bytecode = bc + "\xff"
+        self.bytecode = bc
         self.resolve_jmps()
+        if DEBUG:
+            colls = 20
+            count = 0
+            print "final bytecode"
+            sys.stdout.write(" ")
+            for c in parser.bytecode:
+                sys.stdout.write("%02x " % ord(c))
+                count += 1
+                if count % colls == 0:
+                    sys.stdout.write("\n")
+                if count % 4 == 0:
+                    sys.stdout.write(" ")
+            print
+        return COMP_SUCCESS
+
+class Packager:
+    def __init__(self, bf=""):
+        self.bin_file = bf
+
+    def wbc(self, bytecode):
+        """
+        write bytecode into self.bin_file
+        """
+        if len(self.bin_file) == 0:
+            print "compiler not initialized"
+            return COMP_FAILED
+        if os.path.exists(self.bin_file): 
+            if not OVERWRITE:
+                print "%s already exists"
+                return COMP_FAILED
+
+        #############################
+        #                           #
+        # MAGIC | bytecode | "\xff" #
+        #                           #
+        #############################
+        if DEBUG:
+            print "packaging bytecode to %s" % self.bin_file
+        f = open(self.bin_file, "w")
+        f.write(MAGIC)
+        f.write(bytecode)
+        f.write("\xff")
+        f.close()
         return COMP_SUCCESS
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         parser = Parser()
+        pack = Packager("%s.bc" % sys.argv[1])
         parser.opcodes = OPCODES
         if parser.load_code(sys.argv[1]) == COMP_SUCCESS and \
            parser.parse_code() == COMP_SUCCESS and \
-           parser.render_bytecode() == COMP_SUCCESS:
-            out = open("%s.bc" % sys.argv[1], "w")
-            out.write(MAGIC)
-            out.write(parser.bytecode)
-            out.close()
-            print "wrote bytecode to %s.bc (added magic prefix):" % sys.argv[1]
-            for c in parser.bytecode:
-                sys.stdout.write("%02x " % ord(c))
-            print
+           parser.render_bytecode() == COMP_SUCCESS and \
+           pack.wbc(parser.bytecode) == COMP_SUCCESS:
+
+            print "compilation succeeded"
+            
         else:
             print "compilation failed"
