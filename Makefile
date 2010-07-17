@@ -26,4 +26,4 @@ compilo: tools.o compilo.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) $^ -o $@
 
 clean:
-	$(RM) -rf *.o $(MAIN)
+	$(RM) -rf *.o *.bc $(MAIN)
